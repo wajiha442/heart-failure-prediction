@@ -1,11 +1,12 @@
 import streamlit as st
 import numpy as np
 import pickle
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler 
 
 try:
+ 
     with open("heart_failure_svm_model.pkl", "rb") as f:
-        model, scaler = pickle.load(f)
+        model, scaler = pickle.load(f) 
     st.success("Model aur Scaler safalta poorvak load ho chuke hain!")
 
 except FileNotFoundError:
@@ -47,13 +48,19 @@ if st.button("Predict Heart Failure"):
     ]])
 
     try:
+       
         scaled_data = scaler.transform(raw_data)
     except Exception as e:
         st.error(f"Data scale karne mein masla (Scaler Error): {e}")
         st.stop()
 
     prediction = model.predict(scaled_data)
-    prediction_proba = model.predict_proba(scaled_data)[:, 1]
+    
+     
+    try:
+        prediction_proba = model.predict_proba(scaled_data)[:, 1]
+    except AttributeError:
+        prediction_proba = [0.0 if prediction[0] == 0 else 1.0]
 
     st.subheader("Prediction Result:")
     
