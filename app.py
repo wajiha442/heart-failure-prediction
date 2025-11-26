@@ -4,12 +4,12 @@ import pickle
 from sklearn.preprocessing import StandardScaler
 
 try:
-    with open("heart_model.pkl", "rb") as f:
+    with open("heart_failure_svm_model.pkl", "rb") as f:
         model, scaler = pickle.load(f)
     st.success("Model aur Scaler safalta poorvak load ho chuke hain!")
 
 except FileNotFoundError:
-    st.error("Model file nahi mili (heart_model.pkl). Please confirm karein ki file root folder mein hai.")
+    st.error("Model file ab bhi nahi mili! Please GitHub par 'heart_failure_svm_model.pkl' ka naam aur jagah dobara check karein.")
     st.stop()
 except Exception as e:
     st.error(f"Model load karne mein koi aur masla aaya: {e}")
@@ -63,4 +63,3 @@ if st.button("Predict Heart Failure"):
         st.success(f"Low Risk of Heart Failure. (Probability: {prediction_proba[0]*100:.2f}%)")
         
     st.info("⚠️ Yeh sirf ek machine learning prediction hai. Hamesha expert medical advice lein.")
-
