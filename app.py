@@ -1,4 +1,4 @@
- import streamlit as st
+import streamlit as st
 import numpy as np
 import pickle
 from sklearn.preprocessing import StandardScaler
@@ -63,3 +63,4 @@ if st.button("Predict Heart Failure"):
         st.success(f"Low Risk of Heart Failure. (Probability: {prediction_proba[0]*100:.2f}%)")
         
     st.info("⚠️ Yeh sirf ek machine learning prediction hai. Hamesha expert medical advice lein.")
+
