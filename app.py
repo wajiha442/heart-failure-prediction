@@ -1,109 +1,116 @@
-import streamlit as st
+import os
 import numpy as np
-import pickle
 import pandas as pd
-from sklearn.preprocessing import StandardScaler 
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import pickle
+from IPython.display import display
 
- 
-try:
-    with open("heart_failure_svm_model.pkl", "rb") as f:
-        model, scaler = pickle.load(f) 
-    st.success("Model aur Scaler safalta poorvak load ho chuke hain!")
+print("Loading Heart Failure Dataset...")
 
-except FileNotFoundError:
-    st.error("Model file nahi mili ya GitHub par push nahi hui. Filename aur jagah (root folder) check karein.")
-    st.stop()
-except ValueError:
-    st.error("Model file theek se load nahi hui (cannot unpack). Confirm karein ki training mein model aur scaler dono ek saath save kiye gaye hain.")
-    st.stop()
-except Exception as e:
-    st.error(f"Model load karne mein koi aur masla aaya: {e}")
-    st.stop()
+possible_paths = [
+    "/kaggle/input/heart-failure-clinical-data/heart_failure_clinical_records_dataset.csv",
+    "/kaggle/input/heart-failure/heart.csv",
+    "heart.csv",
+    "heart_failure_clinical_records_dataset.csv"
+]
 
-st.title("❤️ Heart Failure Prediction App")
-st.write("Please zaroori information fill karein takay hum Heart Failure ka risk predict kar sakein. Sabhi 12 features zaroori hain.")
+df = None
+for path in possible_paths:
+    if os.path.exists(path):
+        df = pd.read_csv(path)
+        print(f"Loaded dataset from: {path}")
+        break
 
-# Input fields for all 12 raw features
-col1, col2, col3 = st.columns(3)
+if df is None:
+    raise FileNotFoundError("Heart Failure dataset not found.")
 
-with col1:
-    age = st.slider("1. Umar (Age)", 40, 95, 60)
-    ejection_fraction = st.slider("2. Ejection Fraction (%)", 10, 80, 40)
-    serum_sodium = st.slider("3. Serum Sodium (mEq/L)", 113, 148, 137)
-    time = st.number_input("4. Follow-up period (Days)", min_value=10, max_value=300, value=150)
+print(f"Dataset Shape: {df.shape}")
+display(df.head())
 
-with col2:
-    creatinine_phosphokinase = st.number_input("5. CPK (Creatinine Phosphokinase)", value=582, min_value=23)
-    platelets = st.number_input("6. Platelets (kiloplatelets/mL)", value=263.35, min_value=25.0)
-    serum_creatinine = st.number_input("7. Serum Creatinine (mg/dL)", value=1.0, min_value=0.5, max_value=10.0)
-    sex = st.selectbox("8. Jins (Sex)", options=[('Male', 1), ('Female', 0)], format_func=lambda x: x[0])
+print("\nMissing Values:")
+print(df.isnull().sum())
 
-with col3:
-    anaemia = st.selectbox("9. Anaemia", options=[('No', 0), ('Yes', 1)], format_func=lambda x: x[0])
-    diabetes = st.selectbox("10. Diabetes", options=[('No', 0), ('Yes', 1)], format_func=lambda x: x[0])
-    high_blood_pressure = st.selectbox("11. High Blood Pressure", options=[('No', 0), ('Yes', 1)], format_func=lambda x: x[0])
-    smoking = st.selectbox("12. Smoking", options=[('No', 0), ('Yes', 1)], format_func=lambda x: x[0])
+if "DEATH_EVENT" not in df.columns:
+    raise ValueError("Target column DEATH_EVENT missing.")
 
+print("\nApplying Binning on Key Numerical Columns...")
 
-if st.button("Predict Heart Failure"):
-    
-     
-    age_group_Middle = 1 if 50 < age <= 70 else 0
-    age_group_Old = 1 if age > 70 else 0
-    
-    
-    ejection_fraction_group_Low = 1 if ejection_fraction <= 30 else 0
-    ejection_fraction_group_High = 1 if ejection_fraction > 50 else 0
-    
-    
-    serum_sodium_group_Normal = 1 if 135 < serum_sodium <= 145 else 0
-    serum_sodium_group_High = 1 if serum_sodium > 145 else 0
+df["age_group"] = pd.cut(df["age"], bins=[0, 50, 70, 100], labels=["Young", "Middle", "Old"])
+df["ejection_fraction_group"] = pd.cut(df["ejection_fraction"], bins=[0, 30, 50, 100], labels=["Low", "Medium", "High"])
+df["serum_sodium_group"] = pd.cut(df["serum_sodium"], bins=[0, 135, 145, 200], labels=["Low", "Normal", "High"])
 
-     
-    raw_data_preprocessed = np.array([[
-        age, 
-        anaemia[1], 
-        creatinine_phosphokinase, 
-        diabetes[1], 
-        ejection_fraction, 
-        high_blood_pressure[1], 
-        platelets, 
-        serum_creatinine, 
-        serum_sodium, 
-        smoking[1], 
-        time,
-        sex[1],
-        
-        
-        age_group_Middle, 
-        age_group_Old,
-        ejection_fraction_group_Low,
-        ejection_fraction_group_High,
-        serum_sodium_group_Normal,
-        serum_sodium_group_High
-    ]])
+display(df.head())
 
-    try:
-        scaled_data = scaler.transform(raw_data_preprocessed)
-    except ValueError as e:
-        st.error(f"Scaling Error: Data mein {raw_data_preprocessed.shape[1]} features hain, lekin Scaler ko {scaler.n_features_in_} features chahiye. Training aur App features ka count/order check karein. {e}")
-        st.stop()
-    except Exception as e:
-        st.error(f"Data scale karne mein masla: {e}")
-        st.stop()
+print("\nPlotting Binned Features...")
 
-    prediction = model.predict(scaled_data)
-    
-    try:
-        prediction_proba = model.predict_proba(scaled_data)[:, 1]
-    except AttributeError:
-        prediction_proba = [0.0 if prediction[0] == 0 else 1.0]
+fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+sns.countplot(x='age_group', data=df, ax=axes[0])
+sns.countplot(x='ejection_fraction_group', data=df, ax=axes[1])
+sns.countplot(x='serum_sodium_group', data=df, ax=axes[2])
+axes[0].set_title("Age Categories")
+axes[1].set_title("Ejection Fraction Categories")
+axes[2].set_title("Serum Sodium Categories")
+plt.tight_layout()
+plt.show()
 
-    st.subheader("Prediction Result:")
-    
-    if prediction[0] == 1:
-        st.error(f"High Risk of Heart Failure! (Probability: {prediction_proba[0]*100:.2f}%)")
-    else:
-        st.success(f"Low Risk of Heart Failure. (Probability: {prediction_proba[0]*100:.2f}%)")
-        
-    st.info("⚠️ Yeh sirf ek machine learning prediction hai. Hamesha expert medical advice lein.")
+print("\nOne-Hot Encoding...")
+
+df_encoded = pd.get_dummies(df,
+                            columns=["age_group", "ejection_fraction_group", "serum_sodium_group"],
+                            drop_first=True)
+
+display(df_encoded.head())
+
+X = df_encoded.drop(columns=["DEATH_EVENT"])
+y = df_encoded["DEATH_EVENT"]
+
+print("\nSplitting Train/Test Sets...")
+x_train, x_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.20, random_state=42, stratify=y
+)
+
+print(f"Train Shape = {x_train.shape}")
+print(f"Test Shape = {x_test.shape}")
+
+scaler = StandardScaler()
+x_train = scaler.fit_transform(x_train)
+x_test = scaler.transform(x_test)
+
+print("\nTraining SVM Model...")
+
+model = SVC(kernel="rbf", C=1.0, gamma="scale", random_state=42)
+model.fit(x_train, y_train)
+y_pred = model.predict(x_test)
+
+print("\nAccuracy Score:")
+acc = accuracy_score(y_test, y_pred)
+print(f"{acc * 100:.2f}%")
+
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+
+print("Confusion Matrix:")
+cm = confusion_matrix(y_test, y_pred)
+plt.figure(figsize=(6, 5))
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.title("Heart Failure — Confusion Matrix")
+plt.show()
+
+# Save the fitted scaler
+scaler_filename = "scaler.pkl"
+with open(scaler_filename, "wb") as f:
+    pickle.dump(scaler, f)
+print(f"Scaler saved as: {scaler_filename}")
+
+# Save the model
+model_filename = "heart_failure_svm_model.pkl"
+with open(model_filename, "wb") as f:
+    pickle.dump(model, f)
+print(f"\nModel saved as: {model_filename}")
