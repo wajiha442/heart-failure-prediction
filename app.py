@@ -1,4 +1,4 @@
- import streamlit as st
+import streamlit as st
 import numpy as np
 import pickle
 
@@ -31,3 +31,4 @@ if st.button("Predict"):
         st.error("⚠️ High Risk of Heart Failure")
     else:
         st.success("✅ Low Risk of Heart Failure")
+
